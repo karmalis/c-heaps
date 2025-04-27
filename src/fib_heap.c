@@ -2,6 +2,54 @@
 #include "utils.h"
 #include <stdint.h>
 
+struct fib_heap_stats {
+    size_t size;
+    size_t tree_count;
+    size_t marked_node_count;
+};
+
+size_t compute_max_rank(fibheap* fheap) {
+    if (fheap->min->next == NULL) {
+        return fheap->min->rank;
+    }
+
+    fibheap_node* root = fheap->min;
+    size_t max_rank = 0;
+
+    do {
+        if (root->rank > max_rank) {
+            max_rank = root->rank;
+        }
+        root = root->next;
+    } while (root != fheap->min);
+
+    return 0;
+}
+
+struct fib_heap_stats compute_fib_heap_stats(fibheap* fheap) {
+    fibheap_node* root = fheap->min;
+    struct fib_heap_stats f_stats;
+    f_stats.marked_node_count = 0;
+    f_stats.tree_count = 0;
+    f_stats.size = 0;
+
+    do {
+        if (root->child != NULL) {
+            // count the children
+            fibheap_node* child = root->child;
+            // TODO finish computing heap stats
+        }
+
+        // Check the neighbor
+
+        root = root->next;
+    } while (root != fheap->min && root != NULL);
+
+
+    return f_stats;
+
+
+}
 
 // Allocates
 fibheap_node* create_node(
@@ -19,8 +67,8 @@ fibheap_node* create_node(
 
     if (child != NULL) {
         node->rank = child->rank + 1;
+        child->parent = node;
     }
-    child->parent = node;
 
     node->parent = NULL;
     node->child = child;
@@ -29,6 +77,60 @@ fibheap_node* create_node(
 
     return node;
 }
+
+// Allocates
+fibheap* create_heap_with_min(fibheap_node* min) {
+    fibheap* fheap = malloc(sizeof(fibheap));
+    fheap->min = min;
+    fheap->max_rank = compute_max_rank(fheap);
+    fheap->size = 0;
+    fheap->tree_count = 0;
+    fheap->marked_node_count = 0;
+
+    return fheap;
+}
+
+// Frees
+void clean_fib_heap(fibheap* fheap) {
+
+    fibheap_node* root = fheap->min;
+    while (root != NULL) {
+
+        // Clear children
+        if (root->child != NULL) {
+            fibheap_node* child = root->child;
+            while (child != NULL && child != root) {
+                if (child->child != NULL) {
+                    child = child->child;
+                    continue;
+                }
+
+                // TODO: Fix clearing of circular buffer
+                fibheap_node* old_child = child;
+                child->next->prev = NULL;
+                child->prev->next = NULL;
+                if (child->next != NULL) {
+                    child = child->next;
+                } else if (child->parent != NULL) {
+                    child = child->parent;
+                } else {
+                    child = NULL;
+                }
+                free(old_child);
+            }
+        }
+
+        // Save current root pointer and switch to the next
+        fibheap_node* old_root = root;
+        root = root->next;
+        // free the root pointer
+        free(old_root);
+    }
+
+    // The heap should be cleared and we can now free itself
+    free(fheap);
+}
+
 
 // Allocates
 void insert_fib(fibheap* fheap, uint32_t key) {

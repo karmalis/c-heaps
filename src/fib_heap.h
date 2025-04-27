@@ -42,4 +42,10 @@ fibheap_node* create_node(
     fibheap_node* prev
 );
 
+// Allocates
+fibheap* create_heap_with_min(fibheap_node* min);
+
+// Frees
+void clean_fib_heap(fibheap* fheap);
+
 #endif // FIBHEAP_H_
