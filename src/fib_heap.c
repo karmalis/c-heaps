@@ -1,5 +1,8 @@
 #include "fib_heap.h"
 #include "utils.h"
+
+#include <assert.h>
+#include <math.h>
 #include <stdint.h>
 
 struct fib_heap_stats {
@@ -8,180 +11,150 @@ struct fib_heap_stats {
     size_t marked_node_count;
 };
 
-size_t compute_max_rank(fibheap* fheap) {
-    if (fheap->min->next == NULL) {
-        return fheap->min->rank;
+
+
+size_t max_rank(fib_cb_t* cb) {
+    if (cb->last == NULL) {
+        return 1;
     }
 
-    fibheap_node* root = fheap->min;
-    size_t max_rank = 0;
+    size_t max_rank = 1;
 
+
+    fibheap_node_t* cursor = cb->last;
     do {
-        if (root->rank > max_rank) {
-            max_rank = root->rank;
+        if (max_rank < cursor->rank) {
+            max_rank = cursor->rank;
         }
-        root = root->next;
-    } while (root != fheap->min);
+        cursor = cursor->next;
+    } while (cursor != cb->last);
 
-    return 0;
+    return max_rank;
 }
 
-struct fib_heap_stats compute_fib_heap_stats(fibheap* fheap) {
-    fibheap_node* root = fheap->min;
-    struct fib_heap_stats f_stats;
-    f_stats.marked_node_count = 0;
-    f_stats.tree_count = 0;
-    f_stats.size = 0;
-
-    do {
-        if (root->child != NULL) {
-            // count the children
-            fibheap_node* child = root->child;
-            // TODO finish computing heap stats
-        }
-
-        // Check the neighbor
-
-        root = root->next;
-    } while (root != fheap->min && root != NULL);
-
-
-    return f_stats;
-
-
-}
 
 // Allocates
-fibheap_node* create_node(
+fibheap_node_t* create_node(
     uint32_t key,
-    uint8_t mark,
-    fibheap_node* parent,
-    fibheap_node* child,
-    fibheap_node* next,
-    fibheap_node* prev
+    uint8_t mark
 ) {
-    fibheap_node* node = malloc(sizeof(fibheap_node));
+    fibheap_node_t * node = malloc(sizeof(fibheap_node_t));
     node->key = key;
     node->mark = mark;
     node->rank = 1;
 
-    if (child != NULL) {
-        node->rank = child->rank + 1;
-        child->parent = node;
-    }
-
-    node->parent = NULL;
-    node->child = child;
-    node->prev = prev;
-    node->next = next;
-
     return node;
 }
 
-// Allocates
-fibheap* create_heap_with_min(fibheap_node* min) {
-    fibheap* fheap = malloc(sizeof(fibheap));
-    fheap->min = min;
-    fheap->max_rank = compute_max_rank(fheap);
-    fheap->size = 0;
-    fheap->tree_count = 0;
-    fheap->marked_node_count = 0;
+fib_cb_t* create_circular_buffer(fibheap_node_t* parent) {
+    fib_cb_t* cb = malloc(sizeof(fib_cb_t));
+    cb->parent = parent;
+    return cb;
+}
 
-    return fheap;
+void insert_cb_after(fibheap_node_t* node, fibheap_node_t* n) {
+    n->next = node->next;
+    n->prev = node;
+    if (node->next != NULL) {
+        node->next->prev = n;
+    }
+    node->next = n;
+}
+
+void insert_cb_into(fib_cb_t* cb, fibheap_node_t* node) {
+    if (cb->last != NULL) {
+        insert_cb_after(cb->last, node);
+    } else {
+        cb->last = node;
+    }
+
+    // Update parent rank
+    if (cb->parent != NULL) {
+        cb->parent->rank = max_t(cb->parent->rank, (node->rank + 1));
+    }
+}
+
+
+void add_node_child(fibheap_node_t* node, fibheap_node_t* child) {
+    if (node->children != NULL) {
+        insert_cb_into(node->children, child);
+    } else {
+        fib_cb_t* children = create_circular_buffer(node);
+        insert_cb_into(children, child);
+        node->children = children;
+    }
+}
+
+void release_circular_buffer(fib_cb_t* cb);
+
+void remove_node(fib_cb_t* cb, fibheap_node_t* node) {
+    if (node->next == node) {
+        cb->last = NULL;
+    } else if (node->next != NULL) {
+        node->next->prev = node->prev;
+        if (node->prev != NULL) {
+            node->prev->next = node->next;
+            if (node == cb->last) {
+                cb->last = node->prev;
+            }
+        }
+    }
+
+    // Reset parent rank if such exists
+    if (cb->parent != NULL) {
+        cb->parent->rank = max_rank(cb);
+    }
+
+    if (node->children != NULL) {
+        release_circular_buffer(node->children);
+    }
+
+    free(node);
+}
+
+void release_circular_buffer(fib_cb_t* cb) {
+    if (cb->last != NULL) {
+        fibheap_node_t* cursor = cb->last;
+        do {
+            fibheap_node_t* next = cursor->next;
+            remove_node(cb, cursor);
+            cursor = cursor->next;
+        } while (cursor != NULL);
+    }
+
+    free(cb);
 }
 
 // Frees
-void clean_fib_heap(fibheap* fheap) {
-
-    fibheap_node* root = fheap->min;
-    while (root != NULL) {
-
-        // Clear children
-        if (root->child != NULL) {
-            fibheap_node* child = root->child;
-            while (child != NULL && child != root) {
-                if (child->child != NULL) {
-                    child = child->child;
-                    continue;
-                }
-
-                // TODO: Fix clearing of circular buffer
-                fibheap_node* old_child = child;
-                child->next->prev = NULL;
-                child->prev->next = NULL;
-                if (child->next != NULL) {
-                    child = child->next;
-                } else if (child->parent != NULL) {
-                    child = child->parent;
-                } else {
-                    child = NULL;
-                }
-                free(old_child);
-            }
-        }
-
-        // Save current root pointer and switch to the next
-        fibheap_node* old_root = root;
-        root = root->next;
-        // free the root pointer
-        free(old_root);
-    }
-
-    // The heap should be cleared and we can now free itself
+void release_fib_heap(fibheap* fheap) {
+    release_circular_buffer(fheap->root);
     free(fheap);
 }
 
 
 // Allocates
 void insert_fib(fibheap* fheap, uint32_t key) {
-    fibheap_node* node = malloc(sizeof(fibheap_node));
+    fibheap_node_t* node = create_node(key, 0);
 
-    node->key = key;
-    node->mark = 0;
-    node->rank = 1;
+    insert_cb_into(fheap->root, node);
 
     if (fheap->min == NULL) {
         fheap->min = node;
         return;
     }
 
-    if (fheap->min->next != NULL) {
-        node->next = fheap->min->next;
-    }
-
-    fheap->min->next = node;
-    node->prev = fheap->min;
-
     if (fheap->min->key > node->key) {
         fheap->min = node;
     }
 }
 
-
+// Will free heap_b
 void merge_fib(fibheap* heap_a, fibheap* heap_b) {
-    if (heap_b->min == NULL) {
-        free(heap_b);
-        return;
-    }
+    assert(heap_a->root != NULL);
+    assert(heap_b->min != NULL);
 
-    if (heap_a->min == NULL) {
-        heap_a->min = heap_b->min;
-        free(heap_b);
-    }
-
-    if (heap_a->min->next != NULL) {
-        heap_b->min->next = heap_a->min->next;
-    }
-
-    if (heap_b->min->prev != NULL) {
-        heap_a->min->next = heap_b->min->prev;
-        heap_b->min->prev->prev = heap_a->min;
-    } else {
-        heap_a->min->next = heap_b->min;
-        heap_b->min->prev = heap_a->min;
-    }
-
-    if (heap_b->min->key < heap_a->min->key) {
+    insert_cb_into(heap_a->root, heap_b->min);
+    if (heap_b->min < heap_a->min) {
         heap_a->min = heap_b->min;
     }
 
@@ -194,6 +167,8 @@ void merge_fib(fibheap* heap_a, fibheap* heap_b) {
 }
 
 uint32_t extract_min_fib(fibheap* fheap) {
+
+
     fibheap_node* min = fheap->min;
 
     if (min == NULL) {

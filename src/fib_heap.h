@@ -4,20 +4,30 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+struct fibheap_node;
+
+typedef struct fib_cb {
+
+    fibheap_node* parent;
+    fibheap_node* last;
+
+} fib_cb_t;
+
 typedef struct fibheap_node {
     uint32_t key; // Key
 
     size_t rank; // Rank or sometimes called degree
     uint8_t mark; // Is the marked or no (0 or 1)
 
-    struct fibheap_node* parent;
-    struct fibheap_node* child;
+    fib_cb_t* children;
+
     struct fibheap_node* next;
     struct fibheap_node* prev;
-} fibheap_node;
+} fibheap_node_t;
 
 typedef struct fibheap {
-    fibheap_node* min;
+    fibheap_node_t* min;
+    fib_cb_t* root;
 
     size_t size;
     size_t max_rank;
@@ -25,6 +35,17 @@ typedef struct fibheap {
     size_t marked_node_count;
 } fibheap;
 
+
+// Allocates
+// Creates a fibheap node
+fibheap_node* create_node(
+    uint32_t key,
+    uint8_t mark
+);
+
+
+
+//// Old code
 // Allocates
 void insert_fib(fibheap* fheap, uint32_t key);
 // Merges b into a, frees b
@@ -33,19 +54,9 @@ void merge_fib(fibheap* heap_a, fibheap* heap_b);
 uint32_t extract_min_fib(fibheap* fheap);
 
 // Allocates
-fibheap_node* create_node(
-    uint32_t key,
-    uint8_t mark,
-    fibheap_node* parent,
-    fibheap_node* child,
-    fibheap_node* next,
-    fibheap_node* prev
-);
-
-// Allocates
 fibheap* create_heap_with_min(fibheap_node* min);
 
 // Frees
-void clean_fib_heap(fibheap* fheap);
+void release_fib_heap(fibheap* fheap);
 
 #endif // FIBHEAP_H_

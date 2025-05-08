@@ -60,33 +60,39 @@ void test_simple_pop() {
     n3->next = n7;
 
 
+    fibheap* fheap = malloc(sizeof(fibheap));
+    fheap->marked_node_count = 3;
+    fheap->tree_count = 5;
+    fheap->max_rank = 3;
+    fheap->size = 14;
+    fheap->min = n3;
 
+    //uint32_t popped = extract_min_fib(fheap);
 
-
-
+    release_fib_heap(fheap);
 }
 
 
 int main(int argc, char** argv) {
-    size_t n;
-    char* endptr;
+    /* size_t n; */
+    /* char* endptr; */
 
-    if (argc != 2) {
-        fprintf(stderr, "Usage: %s <number>\n", argv[0]);
-        return EXIT_FAILURE;
-    }
+    /* if (argc != 2) { */
+    /*     fprintf(stderr, "Usage: %s <number>\n", argv[0]); */
+    /*     return EXIT_FAILURE; */
+    /* } */
 
-    errno = 0;
+    /* errno = 0; */
 
-    unsigned long ul = strtoul(argv[1], &endptr, 10);
-    if (endptr == argv[1] || *endptr != '\0') {
-        fprintf(stderr, "Invalid number format: %s\n", argv[1]);
-        return EXIT_FAILURE;
-    }
+    /* unsigned long ul = strtoul(argv[1], &endptr, 10); */
+    /* if (endptr == argv[1] || *endptr != '\0') { */
+    /*     fprintf(stderr, "Invalid number format: %s\n", argv[1]); */
+    /*     return EXIT_FAILURE; */
+    /* } */
 
-    n = (size_t)ul;
+    /* n = (size_t)ul; */
 
-    srand(time(NULL));
-
+    /* srand(time(NULL)); */
+    test_simple_pop();
     return EXIT_SUCCESS;
 }
