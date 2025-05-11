@@ -20,7 +20,6 @@ size_t max_rank(fib_cb_t* cb) {
 
     size_t max_rank = 1;
 
-
     fibheap_node_t* cursor = cb->last;
     do {
         if (max_rank < cursor->rank) {
@@ -74,6 +73,11 @@ void insert_cb_into(fib_cb_t* cb, fibheap_node_t* node) {
     }
 }
 
+// Frees b circular buffer
+void merge_cb(fib_cb_t* cb_a, fib_cb_t* cb_b) {
+
+}
+
 
 void add_node_child(fibheap_node_t* node, fibheap_node_t* child) {
     if (node->children != NULL) {
@@ -84,8 +88,6 @@ void add_node_child(fibheap_node_t* node, fibheap_node_t* child) {
         node->children = children;
     }
 }
-
-void release_circular_buffer(fib_cb_t* cb);
 
 void remove_node(fib_cb_t* cb, fibheap_node_t* node) {
     if (node->next == node) {
@@ -153,7 +155,13 @@ void merge_fib(fibheap* heap_a, fibheap* heap_b) {
     assert(heap_a->root != NULL);
     assert(heap_b->min != NULL);
 
-    insert_cb_into(heap_a->root, heap_b->min);
+    if (heap_b->min->next == NULL) {
+        // heap b has only one node at root
+        insert_cb_into(heap_a->root, heap_b->min);
+    } else {
+        merge_cb(heap_a->root, heap_b->root);
+    }
+
     if (heap_b->min < heap_a->min) {
         heap_a->min = heap_b->min;
     }
@@ -167,13 +175,13 @@ void merge_fib(fibheap* heap_a, fibheap* heap_b) {
 }
 
 uint32_t extract_min_fib(fibheap* fheap) {
-
-
-    fibheap_node* min = fheap->min;
+    fibheap_node_t* min = fheap->min;
 
     if (min == NULL) {
         return 0;
     }
+
+
 
     uint32_t result = min->key;
 

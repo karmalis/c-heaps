@@ -43,11 +43,20 @@ fibheap_node* create_node(
     uint8_t mark
 );
 
+// Circular buffer functions
+fib_cb_t* create_circular_buffer(fibheap_node_t* parent);
+void insert_cb_after(fibheap_node_t* node, fibheap_node_t* n);
+void insert_cb_into(fib_cb_t* cb, fibheap_node_t* node);
+void merge_cb(fib_cb_t* cb_a, fib_cb_t* cb_b);
+void add_node_child(fibheap_node_t* node, fibheap_node_t* child);
+void release_circular_buffer(fib_cb_t* cb);
+void remove_node(fib_cb_t* cb, fibheap_node_t* node);
 
-
-//// Old code
-// Allocates
+// Fib heap functions
+void release_fib_heap(fibheap* fheap);
 void insert_fib(fibheap* fheap, uint32_t key);
+
+
 // Merges b into a, frees b
 void merge_fib(fibheap* heap_a, fibheap* heap_b);
 // frees min
