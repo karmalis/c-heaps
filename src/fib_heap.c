@@ -2,8 +2,8 @@
 #include "utils.h"
 
 #include <assert.h>
-#include <math.h>
 #include <stdint.h>
+#include <string.h>
 
 struct fib_heap_stats {
     size_t size;
@@ -11,6 +11,9 @@ struct fib_heap_stats {
     size_t marked_node_count;
 };
 
+fibheap_node_t* min_node(fibheap_node_t* node_a, fibheap_node_t* node_b) {
+    return node_a->key < node_b->key ? node_a : node_b;
+}
 
 
 size_t max_rank(fib_cb_t* cb) {
@@ -31,6 +34,16 @@ size_t max_rank(fib_cb_t* cb) {
     return max_rank;
 }
 
+fibheap_t* create_heap_with_min(fibheap_node_t* min) {
+    fibheap_t* heap = malloc(sizeof(fibheap_t*));
+    heap->root = create_circular_buffer(min);
+    heap->max_rank = 0;
+    heap->min = min;
+    heap->tree_count = 1;
+    heap->marked_node_count = 0;
+    heap->size = 1;
+}
+
 
 // Allocates
 fibheap_node_t* create_node(
@@ -40,7 +53,7 @@ fibheap_node_t* create_node(
     fibheap_node_t * node = malloc(sizeof(fibheap_node_t));
     node->key = key;
     node->mark = mark;
-    node->rank = 1;
+    node->rank = 0;
 
     return node;
 }
@@ -74,8 +87,34 @@ void insert_cb_into(fib_cb_t* cb, fibheap_node_t* node) {
 }
 
 // Frees b circular buffer
+// TODO: Test validity
 void merge_cb(fib_cb_t* cb_a, fib_cb_t* cb_b) {
+    if (cb_a->last->next == NULL) {
+        // Buffer A has only one child
+        insert_cb_into(cb_b, cb_a->last);
+        free(cb_b);
+        return;
+    }
 
+    if (cb_b->last->next == NULL) {
+        // Buffer B has only one child
+        insert_cb_into(cb_a, cb_b->last);
+        free(cb_b);
+        return;
+    }
+
+    fibheap_node_t* cursor = cb_b->last;
+    do {
+        fibheap_node_t* next = cursor->next;
+        insert_cb_after(cb_a->last, cursor);
+        cursor = next;
+    } while (cursor != cb_b->last);
+
+    if (cb_a->parent != NULL) {
+        cb_a->parent->rank = max_rank(cb_a) + 1;
+    }
+
+    free(cb_b);
 }
 
 
@@ -89,7 +128,7 @@ void add_node_child(fibheap_node_t* node, fibheap_node_t* child) {
     }
 }
 
-void remove_node(fib_cb_t* cb, fibheap_node_t* node) {
+void remove_cb_node(fib_cb_t* cb, fibheap_node_t* node, int release_children) {
     if (node->next == node) {
         cb->last = NULL;
     } else if (node->next != NULL) {
@@ -102,16 +141,16 @@ void remove_node(fib_cb_t* cb, fibheap_node_t* node) {
         }
     }
 
-    // Reset parent rank if such exists
+    if (node->children != NULL && release_children) {
+        release_circular_buffer(node->children);
+    }
+
     if (cb->parent != NULL) {
         cb->parent->rank = max_rank(cb);
     }
 
-    if (node->children != NULL) {
-        release_circular_buffer(node->children);
-    }
-
     free(node);
+    node = NULL;
 }
 
 void release_circular_buffer(fib_cb_t* cb) {
@@ -119,26 +158,34 @@ void release_circular_buffer(fib_cb_t* cb) {
         fibheap_node_t* cursor = cb->last;
         do {
             fibheap_node_t* next = cursor->next;
-            remove_node(cb, cursor);
+            remove_cb_node(cb, cursor, 1);
             cursor = cursor->next;
         } while (cursor != NULL);
     }
 
     free(cb);
+    cb = NULL;
 }
 
 // Frees
-void release_fib_heap(fibheap* fheap) {
+void release_fib_heap(fibheap_t* fheap) {
     release_circular_buffer(fheap->root);
     free(fheap);
+    fheap = NULL;
 }
 
 
 // Allocates
-void insert_fib(fibheap* fheap, uint32_t key) {
+void insert_fib(fibheap_t* fheap, uint32_t key, uint8_t mark) {
     fibheap_node_t* node = create_node(key, 0);
+    node->mark = mark;
 
     insert_cb_into(fheap->root, node);
+
+    fheap->size += 1;
+    if (mark) {
+        fheap->marked_node_count += 1;
+    }
 
     if (fheap->min == NULL) {
         fheap->min = node;
@@ -151,7 +198,7 @@ void insert_fib(fibheap* fheap, uint32_t key) {
 }
 
 // Will free heap_b
-void merge_fib(fibheap* heap_a, fibheap* heap_b) {
+void merge_fib(fibheap_t* heap_a, fibheap_t* heap_b) {
     assert(heap_a->root != NULL);
     assert(heap_b->min != NULL);
 
@@ -172,128 +219,91 @@ void merge_fib(fibheap* heap_a, fibheap* heap_b) {
     heap_a->marked_node_count += heap_b->marked_node_count;
 
     free(heap_b);
+    heap_b = NULL;
 }
 
-uint32_t extract_min_fib(fibheap* fheap) {
+uint32_t extract_min_fib(fibheap_t* fheap) {
     fibheap_node_t* min = fheap->min;
 
     if (min == NULL) {
         return 0;
     }
 
-
-
     uint32_t result = min->key;
+    fib_cb_t* min_children = min->children;
+
+    // Remove the node from the circular buffer
+    remove_cb_node(fheap->root, fheap->min, 0);
 
     // Pull the min node's tree up to the root level
-    if (min->child != NULL && min->prev != min->next) {
-        fibheap_node* prev = min->child;
-        if (min->child->prev != NULL) {
-            prev = min->child->prev;
-        }
-        fibheap_node* next = min->child;
-        if (min->child->next != NULL) {
-            next = min->child->next;
-        }
-
-        if (prev != next) {
-            min->prev->next = prev;
-            min->next->prev = next;
-        } else {
-            min->prev->next = min->child;
-            min->child->prev = min->prev;
-
-            min->next->prev = min->child;
-            min->child->next = min->next;
-        }
-    } else if (min->prev != min->next) {
-        min->prev->next = min->next;
-        min->next->prev = min->prev;
+    if (min->children != NULL) {
+        merge_cb(fheap->root, min->children);
     }
 
-    // Check for a new minimum
-    fibheap_node* new_min = min->next;
-    fibheap_node* cursor = min->next;
-    fibheap_node* stop = min->next;
-    size_t idx = 0;
-    while (cursor != stop || idx != 0) {
-
-        if (cursor->key < new_min->key && cursor != min) {
+    // Update for new minimum
+    fibheap_node_t* cursor = fheap->root->last;
+    fibheap_node_t* new_min = cursor;
+    do {
+        if (cursor->key < new_min->key) {
             new_min = cursor;
         }
 
-        idx++;
         cursor = cursor->next;
-    }
+    } while (cursor != fheap->root->last);
+    cursor = NULL;
+    fheap->min = new_min;
 
-    // Consolidation part
-    // Cursor should be at the "start"
-    fibheap_node** ranks = malloc(sizeof(fibheap_node) * fheap->max_rank);
-    idx = 0;
-    while (cursor != stop || idx != 0) {
-        size_t rank = cursor->rank;
-        fibheap_node* ranked = ranks[rank];
+    // Recompute max rank
+    // Children buffer ranks should be computed from inserts
+    fheap->max_rank = max_rank(fheap->root);
+
+    // Start consolidating
+    fibheap_node_t** ranks = malloc(sizeof(fibheap_node_t*) * fheap->max_rank);
+    cursor = fheap->min;
+    size_t rank;
+    fibheap_node_t* ranked;
+
+    do {
+consolidation_iter:
+        rank = cursor->rank;
+        ranked = ranks[rank];
+
         if (ranked == NULL) {
-            // We set the rank to contain a pointer
-            ranked = cursor;
-        } else {
-            // Link higher into lower
-            fibheap_node* parent = NULL;
-            fibheap_node* child = NULL;
+            // No other node of this rank yet
+            // set this node to be of this rank
+            ranks[rank] = cursor;
+        } else if (ranked != cursor) {
+            // There can be only one root of a rank
+            // we consolidate the two by taking the node of a higher key
+            // and placing it as a child of the lower key node
+            fibheap_node_t* lower = min_node(cursor, ranked);
+            fibheap_node_t* higher = (higher == cursor) ? ranked : cursor;
 
-            // Actual consolidation
-            // Select the lower key node
-            if (cursor->key < ranked->key) {
-                parent = cursor;
-                child = ranked;
-            } else {
-                parent = ranked;
-                child = cursor;
+            // Before we insert into lower node as child, we first need to
+            // update 0 order buffer
+            if (higher->prev != NULL) {
+                higher->prev->next = higher->next;
             }
-
-            // we also need to make sure the new child's old connections are
-            // reconnected with the child's apropriate neighbors
-            if (child->prev != NULL && child->prev != child->next) {
-                child->prev->next = child->next;
-                child->next->prev = child->prev;
+            if (higher->next != NULL) {
+                higher->next->prev = higher->prev;
             }
+            // Insert higher as a child of lower node
+            insert_cb_into(lower->children, higher);
+            // Update ranked
+            ranks[rank] = lower;
 
-            // Easy selection if we're merging with an empty tree
-            if (parent->child == NULL) {
-                parent->child = child;
-            } else {
-                // parent has a child, we have to insert the other child into the ring
-                // buffer as the previous
-                if (parent->child->prev != NULL) {
-                    // parent's child has a previous item
-                    parent->child->prev->next = child;
-                    child->next = parent->child;
-                    child->prev = parent->child->prev;
-                } else {
-                    // parent has a child but no previous or next item
-                    parent->child->prev = child;
-                    child->next = parent->child;
-                    child->prev = parent->child;
-                }
-            }
+            // Reset the cursor and consolidation parameters
+            cursor = fheap->min;
+            memset(ranks, 0, sizeof(fibheap_node_t*) * fheap->max_rank);
 
-            // Consolidation has happened and topology changed
-            // We need to restart the scan
-            parent->mark += child->mark;
-            parent->rank = max_t(parent->rank, child->rank) + 1;
+            fheap->max_rank = max_rank(fheap->root);
+            ranks = realloc(ranks, sizeof(fibheap_node_t*) * fheap->max_rank);
 
-            cursor = new_min->next;
-            idx = 0;
-            continue;
+            goto consolidation_iter;
         }
 
-        idx++;
         cursor = cursor->next;
-    }
-
-    // Release the minimum
-    free(min);
-    // Release the ranks
+    } while (cursor != fheap->min);
     free(ranks);
 
     return result;

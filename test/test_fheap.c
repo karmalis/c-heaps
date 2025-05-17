@@ -6,13 +6,13 @@
 #include <errno.h>
 
 /*
-** Test graph
+** Test fib heap
 **
-** 7----24----23----17----3
-** |   / |              / | \
-** 30 26 46           18 52 41
+** 17---24----23----7-----3
+** |   /  |             / | \
+** 30 26m 46          18m 52 41
 **     |               |     |
-**    36              39    44
+**    36              39m    44
 **
 ** Min is 3 and there are 3 marked nodes with keys: 26, 18, 39
 **
@@ -21,78 +21,59 @@
 ** extraction
 **
  */
-void test_simple_pop() {
-    fibheap_node *n3_child_1 = create_node(
-        18, 1, NULL, create_node(39, 1, NULL, NULL, NULL, NULL), NULL, NULL);
 
-    fibheap_node *n3_child_2 = create_node(52, 0, NULL, NULL, NULL, n3_child_1);
+void basic_function_tests() {
 
-    fibheap_node *n3_child_3 =
-        create_node(41, 0, NULL, create_node(44, 0, NULL, NULL, NULL, NULL),
-                    n3_child_1, n3_child_2);
+    fibheap_node_t* n3 = create_node(3, 0);
 
-    n3_child_1->next = n3_child_2;
-    n3_child_1->prev = n3_child_3;
-    n3_child_2->next = n3_child_3;
+    fibheap_node_t* n3_18m = create_node(18, 1);
+    fibheap_node_t* n3_18m_39m = create_node(39, 1);
+    add_node_child(n3_18m, n3_18m_39m);
+    add_node_child(n3, n3_18m);
 
-    fibheap_node *n3 = create_node(3, 0, NULL, n3_child_2, NULL, NULL);
-    n3_child_1->parent = n3;
-    n3_child_2->parent = n3;
-    n3_child_3->parent = n3;
+    fibheap_node_t* n3_52 = create_node(52, 0);
+    add_node_child(n3, n3_52);
 
-    fibheap_node *n23 = create_node(23, 0, NULL, NULL, n3, NULL);
-    n3->prev = n23;
+    fibheap_node_t* n3_41 = create_node(41, 0);
+    fibheap_node_t* n3_41_44 = create_node(44, 0);
+    add_node_child(n3_41, n3_41_44);
+    add_node_child(n3, n3_41);
 
-    fibheap_node *n24_child_1 = create_node(
-        26, 1, NULL, create_node(35, 0, NULL, NULL, NULL, NULL), NULL, NULL);
+    fib_cb_t* root = create_circular_buffer(NULL);
+    insert_cb_into(root, n3);
 
-    fibheap_node *n24_child_2 =
-        create_node(46, 0, NULL, NULL, n24_child_1, n24_child_1);
-    n24_child_1->prev = n24_child_2;
-    n24_child_1->next = n24_child_2;
+    fibheap_node_t* n7 = create_node(7, 0);
+    insert_cb_into(root, n7);
 
-    fibheap_node *n24 = create_node(24, 0, NULL, n24_child_2, n23, NULL);
-    n24_child_1->parent = n24;
-    n23->prev = n24;
+    fibheap_node_t* n23 = create_node(23, 0);
+    insert_cb_into(root, n23);
 
-    fibheap_node *n7 = create_node(
-        7, 0, NULL, create_node(30, 0, NULL, NULL, NULL, NULL), n24, n3);
-    n3->next = n7;
+    fibheap_node_t* n24 = create_node(24, 0);
+    fibheap_node_t* n24_26m = create_node(26, 1);
+    add_node_child(n24, n24_26m);
 
+    fibheap_node_t* n24_26m_36 = create_node(36, 0);
+    add_node_child(n24_26m, n24_26m_36);
 
-    fibheap* fheap = malloc(sizeof(fibheap));
-    fheap->marked_node_count = 3;
-    fheap->tree_count = 5;
-    fheap->max_rank = 3;
-    fheap->size = 14;
-    fheap->min = n3;
+    fibheap_node_t* n46 = create_node(46, 0);
+    add_node_child(n24, n46);
 
-    //uint32_t popped = extract_min_fib(fheap);
+    insert_cb_into(root,n24);
 
-    release_fib_heap(fheap);
+    fibheap_node_t* n17 = create_node(17, 0);
+    fibheap_node_t* n30 = create_node(30, 0);
+    add_node_child(n17, n30);
+
+    insert_cb_into(root, n17);
+
+    fibheap_t* heap = create_heap_with_min(n3);
+
+    insert_fib(heap, 21, 0);
+
+    release_fib_heap(heap);
 }
-
-
 int main(int argc, char** argv) {
-    /* size_t n; */
-    /* char* endptr; */
+    basic_function_tests();
 
-    /* if (argc != 2) { */
-    /*     fprintf(stderr, "Usage: %s <number>\n", argv[0]); */
-    /*     return EXIT_FAILURE; */
-    /* } */
-
-    /* errno = 0; */
-
-    /* unsigned long ul = strtoul(argv[1], &endptr, 10); */
-    /* if (endptr == argv[1] || *endptr != '\0') { */
-    /*     fprintf(stderr, "Invalid number format: %s\n", argv[1]); */
-    /*     return EXIT_FAILURE; */
-    /* } */
-
-    /* n = (size_t)ul; */
-
-    /* srand(time(NULL)); */
-    test_simple_pop();
     return EXIT_SUCCESS;
 }

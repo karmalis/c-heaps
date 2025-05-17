@@ -8,8 +8,8 @@ struct fibheap_node;
 
 typedef struct fib_cb {
 
-    fibheap_node* parent;
-    fibheap_node* last;
+    struct fibheap_node* parent;
+    struct fibheap_node* last;
 
 } fib_cb_t;
 
@@ -33,12 +33,12 @@ typedef struct fibheap {
     size_t max_rank;
     size_t tree_count;
     size_t marked_node_count;
-} fibheap;
+} fibheap_t;
 
 
 // Allocates
 // Creates a fibheap node
-fibheap_node* create_node(
+fibheap_node_t* create_node(
     uint32_t key,
     uint8_t mark
 );
@@ -50,22 +50,22 @@ void insert_cb_into(fib_cb_t* cb, fibheap_node_t* node);
 void merge_cb(fib_cb_t* cb_a, fib_cb_t* cb_b);
 void add_node_child(fibheap_node_t* node, fibheap_node_t* child);
 void release_circular_buffer(fib_cb_t* cb);
-void remove_node(fib_cb_t* cb, fibheap_node_t* node);
+void remove_cb_node(fib_cb_t* cb, fibheap_node_t* node, int release_children);
 
 // Fib heap functions
-void release_fib_heap(fibheap* fheap);
-void insert_fib(fibheap* fheap, uint32_t key);
+void release_fib_heap(fibheap_t* fheap);
+void insert_fib(fibheap_t* fheap, uint32_t key, uint8_t mark);
 
 
 // Merges b into a, frees b
-void merge_fib(fibheap* heap_a, fibheap* heap_b);
+void merge_fib(fibheap_t* heap_a, fibheap_t* heap_b);
 // frees min
-uint32_t extract_min_fib(fibheap* fheap);
+uint32_t extract_min_fib(fibheap_t* fheap);
 
 // Allocates
-fibheap* create_heap_with_min(fibheap_node* min);
+fibheap_t* create_heap_with_min(fibheap_node_t* min);
 
 // Frees
-void release_fib_heap(fibheap* fheap);
+void release_fib_heap(fibheap_t* fheap);
 
 #endif // FIBHEAP_H_
